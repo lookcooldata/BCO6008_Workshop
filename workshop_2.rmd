@@ -1,0 +1,20 @@
+---
+title: "Workshop 2"
+author: "Kyle Beall"
+date: "8/6/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+ctrl + alt + i to create r chunk
+```{r}
+library(tidyverse)
+library(skimr)
+
+survey <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-05-18/survey.csv')
+
+```
+
