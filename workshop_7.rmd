@@ -1,0 +1,113 @@
+---
+title: "workshop_7"
+author: "Kyle Beall"
+date: "8/25/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##loading libraries
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(skimr)
+library(janitor)
+```
+
+##to remove old environment data
+```{r}
+rm(list=ls())
+```
+
+
+##loading the data
+```{r}
+volcano_raw<-read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-05-12/volcano.csv')
+```
+
+
+```{r}
+skim(volcano_raw)
+
+volcano_raw%>%filter(last_eruption_year != "Unknown")
+```
+
+##we want to predict the volcano type. First, we want to see how many types we have. 
+```{r}
+volcano_raw%>%count(primary_volcano_type, sort = TRUE)
+
+##there are 26 types of volcanoes. Now we want to go through the categories and see if we can narrow down the feild. 
+```
+
+##cleaning the dataset category names and making factors
+```{r}
+volcano_df <- volcano_raw %>%
+  transmute(volcano_type = 
+              case_when(str_detect(primary_volcano_type, "Stratovolcano") ~ "Stratovolcano",
+                                     str_detect(primary_volcano_type, "Shield") ~ "Shield",
+                                     TRUE ~ "Other"),
+            volcano_number, latitude, longitude, elevation,
+            tectonic_settings, major_rock_1) %>%
+  mutate_if(is.character, factor)
+
+volcano_df%>%count(volcano_type)
+```
+
+##splitting the data (partitioning)
+```{r}
+set.seed(123)
+volcano_df_split<-initial_split(volcano_df)
+volcano_df_train<-training(volcano_df_split)
+volcano_df_test<-testing(volcano_df_split)
+
+volcano_df_train%>%count(volcano_type, sort = TRUE)
+volcano_df_test%>%count(volcano_type, sort = TRUE)
+##there are not many shield examples in our testing set 
+```
+
+##splitting the data with bootstrapping to ensure enough data in all sets
+##use this when data is unbalanced
+##more accurate, but requires more cpu memory and processing time
+```{r}
+volcano_boot<-bootstraps(volcano_df)
+```
+
+
+##building the recipe
+##use 'update_role' to reclassify variable
+```{r}
+volcano_recipe<-recipe(volcano_type~., data = volcano_df)%>%
+  update_role(volcano_number, new_role = "Id")%>%
+  step_other(tectonic_settings)%>%
+  step_other(major_rock_1)%>%
+  step_dummy(tectonic_settings, major_rock_1) %>%
+  step_zv(all_predictors()) %>%
+  step_normalize(all_predictors())
+##always include 'step_zv' as it doesn't hurt
+
+volcano_prep<-prep(volcano_recipe)
+```
+
+##extract data from the recipe
+```{r}
+juice(volcano_prep)
+```
+##if you need to apply the recipe to new data set, you need to use 'bake()'
+
+
+##modelling
+```{r}
+install.packages("ranger")
+library(ranger)
+
+
+##need to choose number of trees 
+rf_spec <- rand_forest(trees = 1000) %>%
+  set_mode("classification") %>%
+  set_engine("ranger")
+```
+
+
